@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      marked:
-        specifier: ^18.0.9
-        version: 18.0.9
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.7
@@ -239,11 +235,6 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  marked@18.0.9:
-    resolution: {integrity: sha512-/Sa4qiiHZxf0/FQdBBowr9q4r10krCwMvpK48FUBdXdUXScDxiQGR9zCPrFgRVR5LU3iySOiIjy09ZQvADir1w==}
-    engines: {node: '>= 20'}
-    hasBin: true
-
 snapshots:
 
   '@biomejs/biome@2.5.7':
@@ -387,5 +378,3 @@ snapshots:
       '@esbuild/win32-arm64': 0.28.1
       '@esbuild/win32-ia32': 0.28.1
       '@esbuild/win32-x64': 0.28.1
-
-  marked@18.0.9: {}

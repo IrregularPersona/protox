@@ -19,10 +19,3 @@ window.waitForElement = (selector) => {
 		observer.observe(document.body, { childList: true, subtree: true });
 	});
 };
-
-window.checkCompMode = () => {
-	if (document.querySelector(".cmpTmHed")) {
-		return true;
-	}
-	return false;
-};

@@ -1,4 +1,4 @@
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/slavcp/glorp/total)<br>
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/IrregularPersona/protox/total)<br>
 
 Glorp uses unorthodox methods in attempt of fixing the issues modern chromium poses for a browser game
 
@@ -18,12 +18,9 @@ I strongly urge you to **review the source code** if you have any doubts.
 - [x] Optimized URL blocklist (only ~50 entries, fully customizable)
 - [x] Resource swapper
 - [x] Custom script support
-- [x] Account Manager
-- [x] Queue ranked without the game open
-- [x] Find out your real ping to the servers
+- [x] CSS override (appends your own styles to the game's stylesheet)
 - [x] CPU Throttler
-- [x] Lightweight autoupdater
-- [x] Basic shortcuts (F11 - toggle fullscreen, F6 new lobby)
+- [x] Basic shortcuts (F11 - toggle fullscreen, F4/F6 - navigate home)
 - [x] and more...
 
 ## Potential issues
@@ -40,8 +37,8 @@ Consider using the CPU Throttler in such scenario
   - [pnpm](https://pnpm.io/installation)
   - [WiX 6 **(if packaging)**](https://github.com/wixtoolset/wix/releases)
 
-1. `git clone https://github.com/slavcp/glorp.git`
-2. `cd glorp`
+1. `git clone https://github.com/IrregularPersona/protox.git`
+2. `cd protox`
 3. `pnpm i`
 4. `pnpm build`
 

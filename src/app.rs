@@ -1,12 +1,8 @@
 use crate::utils::config;
 use crate::{constants, handlers, modules, utils, window};
-use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
 use std::{
     env, fs, io, path, result,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::atomic::{AtomicU64, Ordering},
 };
 use webview2_com::{Microsoft::Web::WebView2::Win32::*, *};
 use windows::Win32::Foundation::*;
@@ -17,7 +13,9 @@ pub fn init_fs() -> result::Result<(), io::Error> {
     let user_profile = path::PathBuf::from(env::var("USERPROFILE").unwrap());
     let client_dir = user_profile.join("Documents").join("glorp");
     let swap_dir = client_dir.join("swapper");
-    let scripts_dir = client_dir.join("scripts").join("social");
+    let scripts_dir = client_dir.join("scripts");
+    let css_dir = client_dir.join("css");
+    let css_override_path = css_dir.join("style.css");
     let flaglist_path = client_dir.join("user_flags.json");
     let blocklist_path = client_dir.join("user_blocklist.json");
 
@@ -25,6 +23,7 @@ pub fn init_fs() -> result::Result<(), io::Error> {
 
     fs::create_dir_all(&swap_dir)?;
     fs::create_dir_all(&scripts_dir)?;
+    fs::create_dir_all(&css_dir)?;
     fs::create_dir_all(&resources_dir)?;
 
     if !path::Path::new(&flaglist_path).exists() {
@@ -32,6 +31,9 @@ pub fn init_fs() -> result::Result<(), io::Error> {
     }
     if !path::Path::new(&blocklist_path).exists() {
         fs::write(&blocklist_path, constants::DEFAULT_BLOCKLIST)?;
+    }
+    if !path::Path::new(&css_override_path).exists() {
+        fs::write(&css_override_path, constants::EXAMPLE_CSS_OVERRIDE)?;
     }
     Ok(())
 }
@@ -82,22 +84,14 @@ pub fn create_main_window(env: Option<ICoreWebView2Environment>) -> window::Wind
     }
 
     let main_window = window::Window::new_core(&start_mode, args, env, state);
-    let discord_client: Arc<Mutex<Option<DiscordIpcClient>>> = Arc::new(Mutex::new(None));
-    if config("discordRPC", true) {
-        let mut client = DiscordIpcClient::new(constants::DISCORD_CLIENT_ID);
-        client.connect().ok();
-        *discord_client.lock().unwrap() = Some(client);
-    }
-
     modules::priority::set(config("webviewPriority", "Normal".to_string()));
 
     if config("userscripts", true)
-        && let Err(e) = modules::userscripts::load(&main_window.webview, false)
+        && let Err(e) = modules::userscripts::load(&main_window.webview)
     {
         eprintln!("Failed to load userscripts: {}", e);
     }
 
-    let main_window_ = main_window.clone();
     let js_bundle = {
         #[allow(unused)]
         let mut buf = String::new();
@@ -106,43 +100,20 @@ pub fn create_main_window(env: Option<ICoreWebView2Environment>) -> window::Wind
             buf = include_str!("../target/bundle.js").to_string();
         }
 
-        #[cfg(feature = "auto-update")]
-        if let Ok(buffer) = modules::lifecycle::read_js_bundle() {
-            buf = buffer;
-        }
-
         buf
     };
 
-    let handler = AddScriptToExecuteOnDocumentCreatedCompletedHandler::create(Box::new(move |_, id| {
-        *crate::SCRIPT_ID.lock().unwrap() = id;
-        Ok(())
-    }));
+    let main_window_ = main_window.clone();
     unsafe {
         main_window
             .webview
-            .AddScriptToExecuteOnDocumentCreated(PCWSTR(utils::create_utf_string(js_bundle).as_ptr()), &handler)
+            .AddScriptToExecuteOnDocumentCreated(PCWSTR(utils::create_utf_string(js_bundle).as_ptr()), None)
             .ok();
     }
 
     handlers::set_handlers(&main_window.webview, &main_window.env);
 
-    unsafe {
-        main_window
-            .webview
-            .AddWebResourceRequestedFilter(
-                PCWSTR(utils::create_utf_string("*://matchmaker.krunker.io/game-info*").as_ptr()),
-                COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
-            )
-            .ok();
-    }
-
-    if config("realPing", false) {
-        modules::ping::load(&main_window.webview);
-    }
-
     let main_window_for_message = main_window.clone();
-    let discord_client_for_message = discord_client.clone();
     let mut web_message_token = 0i64;
     let web_message_handler = WebMessageReceivedEventHandler::create(Box::new(move |webview, args| {
         let Some(webview) = webview else {
@@ -156,14 +127,14 @@ pub fn create_main_window(env: Option<ICoreWebView2Environment>) -> window::Wind
             args.TryGetWebMessageAsString(&mut message).ok();
         }
         let message_string = take_pwstr(message);
-        handlers::handle_web_message(&webview, &main_window_for_message, &discord_client_for_message, &message_string)
+        handlers::handle_web_message(&webview, &main_window_for_message, &message_string)
     }));
     unsafe {
         main_window.webview.add_WebMessageReceived(&web_message_handler, &mut web_message_token).ok();
     }
 
     unsafe {
-        main_window.webview.Navigate(w!("https://krunker.io")).ok();
+        main_window.webview.Navigate(PCWSTR(utils::create_utf_string(constants::TARGET_URL).as_ptr())).ok();
     }
 
     let mut accelerator_token = 0i64;

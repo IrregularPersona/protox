@@ -5,7 +5,12 @@
 		"type": "select",
 		"category": "Main",
 		"defaultValue": "Remember Previous",
-		"options": ["Remember Previous", "Borderless Fullscreen", "Windowed", "Maximized"]
+		"options": [
+			"Remember Previous",
+			"Borderless Fullscreen",
+			"Windowed",
+			"Maximized"
+		]
 	},
 	"uncapFps": {
 		"name": "Uncap FPS",
@@ -47,13 +52,13 @@
 		"buttonAction": "window.chrome.webview.postMessage('open, userscripts')",
 		"needsRestart": true
 	},
-	"checkUpdates": {
-		"name": "Check For Updates",
-		"id": "checkUpdates",
+	"cssOverride": {
+		"name": "CSS Override",
+		"id": "cssOverride",
+		"description": "Appends the contents of Documents/glorp/css/style.css to the game's stylesheet (assets/style-XXXXX.css). Refresh the page to apply changes.",
 		"type": "checkbox",
 		"category": "Main",
-		"defaultValue": true,
-		"needsRestart": true
+		"defaultValue": true
 	},
 	"obsCapturePlugin": {
 		"name": "OBS Capture Plugin",
@@ -62,21 +67,6 @@
 		"type": "checkbox",
 		"category": "Main",
 		"defaultValue": false
-	},
-	"discordRPC": {
-		"name": "Discord Rich Presence",
-		"id": "discordRPC",
-		"type": "checkbox",
-		"category": "Main",
-		"defaultValue": true,
-		"needsRestart": true
-	},
-	"accountManager": {
-		"name": "Account Manager",
-		"id": "accountManager",
-		"type": "checkbox",
-		"category": "Main",
-		"defaultValue": true
 	},
 	"clearCache": {
 		"name": "Clear Cache & Storage",
@@ -87,107 +77,6 @@
 		"button": "Clear Now",
 		"buttonAction": "if(confirm('Are you sure you want to clear cache and local storage?')) { localStorage.clear(); sessionStorage.clear(); window.chrome.webview.postMessage('clear-cache'); }"
 	},
-	"rampBoost": {
-		"name": "Ramp Boosting",
-		"id": "rampBoost",
-		"description": "a much less powerful version of the regular rampboosting but way easier to hit consistently (and more useful in regular matches i'd say); turn off if you plan on using external software",
-		"type": "checkbox",
-		"category": "Game",
-		"defaultValue": false
-	},
-	"hsSound": {
-		"name": "Always Play HS Sound on Kill",
-		"id": "hsSound",
-		"category": "Game",
-		"type": "checkbox",
-		"defaultValue": false
-	},
-	"hpEnemyCounter": {
-		"name": "Hardpoint Enemy counter",
-		"id": "hpEnemyCounter",
-		"description": "Shows the number of enemies present on the hardpoint during competitive matches",
-		"type": "checkbox",
-		"category": "Game",
-		"defaultValue": true
-	},
-	"autoSpec": {
-		"name": "Auto Spectate",
-		"id": "autoSpec",
-		"type": "checkbox",
-		"category": "Game",
-		"defaultValue": false
-	},
-	"showPing": {
-		"name": "Player List Ping",
-		"id": "showPing",
-		"type": "checkbox",
-		"category": "Game",
-		"defaultValue": true,
-		"needsRefresh": true
-	},
-	"exitButton": {
-		"name": "Exit Button",
-		"id": "exitButton",
-		"type": "checkbox",
-		"category": "UI",
-		"defaultValue": true
-	},
-	"menuTimer": {
-		"name": "Menu Timer",
-		"id": "menuTimer",
-		"type": "checkbox",
-		"category": "UI",
-		"defaultValue": true
-	},
-	"betterChat": {
-		"name": "Better Chat",
-		"id": "betterChat",
-		"description": "Groups the team and all chat into a single channel; press tab to switch where you send yours",
-		"type": "checkbox",
-		"category": "UI",
-		"defaultValue": true
-	},
-	"cleanUI": {
-		"name": "Cleaner Menu",
-		"id": "cleanUI",
-		"description": "Remove some of the unnecessary DOM elements",
-		"type": "checkbox",
-		"category": "UI",
-		"defaultValue": false
-	},
-	"hideBundles": {
-		"name": "Hide Bundle Popups",
-		"id": "hideBundles",
-		"type": "checkbox",
-		"category": "UI",
-		"defaultValue": false
-	},
-	"textSelect": {
-		"name": "Selectable Chat",
-		"id": "textSelect",
-		"description": "Make game chat selectable",
-		"type": "checkbox",
-		"category": "UI",
-		"defaultValue": true
-	},
-	"realPing": {
-		"name": "Real Ping™️",
-		"id": "realPing",
-		"description": "Show real network latency™️! pings the lobby every few seconds to get a value;",
-		"type": "checkbox",
-		"category": "UI",
-		"defaultValue": false,
-		"needsRestart": true
-	},
-	"showChangelog": {
-		"name": "Show Changelogs",
-		"id": "showChangelog",
-		"type": "checkbox",
-		"button": "Show Now",
-		"buttonAction": "window.glorp.showChangelogPopup(window.glorp.version)",
-		"category": "UI",
-		"defaultValue": true
-	},
 	"rawInput": {
 		"name": "Raw Input",
 		"id": "rawInput",
@@ -196,15 +85,6 @@
 		"category": "Tweaks",
 		"defaultValue": true,
 		"needsRefresh": true
-	},
-	"renderStats": {
-		"name": "Show Present FPS Counter",
-		"description": "Makes another FPS counter that shows how many frames are presented to the screen next to the default one \n",
-		"id": "renderStats",
-		"type": "checkbox",
-		"category": "Tweaks",
-		"defaultValue": false,
-		"needsRestart": true
 	},
 	"gameFpsLimit": {
 		"name": "Game FPS Limit",
@@ -267,6 +147,13 @@
 		"category": "Tweaks",
 		"defaultValue": "Normal",
 		"needsRestart": true,
-		"options": ["High", "Above Normal", "Normal", "Below Normal", "Low", "Idle"]
+		"options": [
+			"High",
+			"Above Normal",
+			"Normal",
+			"Below Normal",
+			"Low",
+			"Idle"
+		]
 	}
 }

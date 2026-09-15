@@ -1,18 +1,19 @@
 #![allow(non_snake_case)]
 use crate::CONFIG;
-use std::{
-    convert, env, fs, io, mem,
-    path::{self, *},
-};
+use std::{env, mem, path, process};
+#[cfg(feature = "packaged")]
+use std::{backtrace, fs, io, panic};
 use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2;
 use windows::{
     Win32::{
-        Foundation::{CloseHandle, HWND, LPARAM},
+        Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HWND, LPARAM},
         System::{Diagnostics::ToolHelp::*, Threading::*},
         UI::WindowsAndMessaging::*,
     },
     core::*,
 };
+#[cfg(feature = "packaged")]
+use windows::Win32::UI::Shell::ShellExecuteW;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -184,15 +185,6 @@ pub fn set_cpu_throttling(webview: &ICoreWebView2, value: f32) {
     }
 }
 
-pub fn atomic_write(path: &impl AsRef<Path>, data: &impl convert::AsRef<[u8]>) -> io::Result<()> {
-    let path = path.as_ref();
-    let tmp_path = path.with_extension("tmp");
-    fs::write(&tmp_path, data)?;
-
-    fs::rename(tmp_path, path)?;
-    Ok(())
-}
-
 #[macro_export]
 macro_rules! debug_print {
     ($($arg:tt)*) => {
@@ -207,4 +199,89 @@ macro_rules! debug_print {
             }
         }
     };
+}
+
+pub fn register_instance() {
+    unsafe {
+        CreateMutexW(None, false, PCWSTR(create_utf_string(crate::constants::INSTANCE_MUTEX).as_ptr())).ok();
+
+        if GetLastError() == ERROR_ALREADY_EXISTS {
+            eprintln!("Instance already running");
+            process::exit(0);
+        }
+    }
+}
+
+#[cfg(feature = "packaged")]
+pub fn installer_cleanup() -> io::Result<()> {
+    let current_dir = env::current_dir()?;
+
+    for entry in fs::read_dir(&current_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_file()
+            && let Some(extension) = path.extension()
+            && extension.eq_ignore_ascii_case("msi")
+        {
+            fs::remove_file(&path).ok();
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "packaged")]
+pub fn set_panic_hook() -> io::Result<()> {
+    let current_dir = env::current_dir()?;
+    let log_file_path = current_dir.join("crash_log.txt");
+
+    panic::set_hook(Box::new(move |panic_info| {
+        let crash_message = format!(
+            "Location: {}\n\
+            Message: {}\n\
+            \nStack Trace:\n{}\n",
+            {
+                let loc_string = panic_info.location().map(|loc| loc.to_string()).unwrap_or_else(|| "Unknown".to_string());
+                loc_string.to_string()
+            },
+            panic_info
+                .payload()
+                .downcast_ref::<String>()
+                .map(|s| s.as_str())
+                .or_else(|| panic_info.payload().downcast_ref::<&str>().copied())
+                .unwrap_or("<unknown>"),
+            backtrace::Backtrace::force_capture()
+        );
+
+        fs::write(&log_file_path, &crash_message).ok();
+
+        unsafe {
+            let result = MessageBoxW(
+                None,
+                PCWSTR(
+                    create_utf_string(format!(
+                        "A crash report has been saved to:\n\
+                     {}\n\n\
+                     Click Yes to open the log.",
+                        log_file_path.display()
+                    ))
+                    .as_ptr(),
+                ),
+                PCWSTR(create_utf_string("Application Error").as_ptr()),
+                MB_YESNO | MB_ICONERROR,
+            );
+
+            if result == IDYES {
+                ShellExecuteW(
+                    None,
+                    PCWSTR(create_utf_string("open").as_ptr()),
+                    PCWSTR(create_utf_string(log_file_path.to_string_lossy()).as_ptr()),
+                    PCWSTR::null(),
+                    PCWSTR::null(),
+                    SW_SHOW,
+                );
+            }
+        }
+    }));
+    Ok(())
 }

@@ -3,9 +3,8 @@ use std::{
     mem::{self, transmute},
     ptr,
     sync::{
-        self, LazyLock,
+        self,
         atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicUsize},
-        mpsc::{Sender, channel},
     },
     thread,
 };
@@ -20,32 +19,6 @@ use windows::Win32::{
     },
 };
 use windows::core::*;
-
-static SPACE_DOWN: INPUT = INPUT {
-    r#type: INPUT_KEYBOARD,
-    Anonymous: INPUT_0 {
-        ki: KEYBDINPUT {
-            wVk: VK_SPACE,
-            wScan: 0,
-            dwFlags: KEYBD_EVENT_FLAGS(0),
-            time: 0,
-            dwExtraInfo: 0,
-        },
-    },
-};
-
-static SPACE_UP: INPUT = INPUT {
-    r#type: INPUT_KEYBOARD,
-    Anonymous: INPUT_0 {
-        ki: KEYBDINPUT {
-            wVk: VK_SPACE,
-            wScan: 0,
-            dwFlags: KEYEVENTF_KEYUP,
-            time: 0,
-            dwExtraInfo: 0,
-        },
-    },
-};
 
 #[macro_export]
 macro_rules! debug_print {
@@ -63,30 +36,11 @@ macro_rules! debug_print {
     };
 }
 
-static SCROLL_SENDER: LazyLock<Sender<()>> = LazyLock::new(|| {
-    let (tx, rx) = channel();
-    thread::spawn(move || {
-        debug_print!("webview: rampboost input thread started id={}", unsafe { GetCurrentThreadId() });
-        while rx.recv().is_ok() {
-            unsafe {
-                let down = SendInput(&[SPACE_DOWN], mem::size_of::<INPUT>() as i32);
-                Sleep(5);
-                let up = SendInput(&[SPACE_UP], mem::size_of::<INPUT>() as i32);
-                if down != 1 || up != 1 {
-                    debug_print!("webview: rampboost SendInput incomplete down={down} up={up}");
-                }
-            }
-        }
-        debug_print!("webview: rampboost input thread ended");
-    });
-    tx
-});
-
 static mut PREV_WNDPROC_1: WNDPROC = None;
 static mut PREV_WNDPROC_2: WNDPROC = None;
 
 static DRAG_STATUS: AtomicBool = AtomicBool::new(false);
-static F20_DOWN: AtomicBool = AtomicBool::new(false);
+// static F20_DOWN: AtomicBool = AtomicBool::new(false);
 static WINDOW_HANDLE: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static HOOK_HANDLE: AtomicUsize = AtomicUsize::new(0);
 
@@ -243,7 +197,7 @@ fn detach() {
 fn attach() {
     debug_print!("webview: attach started");
     unsafe {
-        let parent = match FindWindowW(w!("krunker_webview"), PCWSTR::null()) {
+        let parent = match FindWindowW(w!("glorp_webview"), PCWSTR::null()) {
             Ok(parent) => parent,
             Err(_error) => {
                 debug_print!("webview: main window not found: {_error}");
@@ -262,7 +216,7 @@ fn attach() {
                 let current_parent = HWND(WINDOW_HANDLE.load(sync::atomic::Ordering::Relaxed));
 
                 if !IsWindow(Some(current_parent)).as_bool() {
-                    let new_parent = FindWindowW(w!("krunker_webview"), PCWSTR::null());
+                    let new_parent = FindWindowW(w!("glorp_webview"), PCWSTR::null());
 
                     if let Ok(new_parent) = new_parent {
                         WINDOW_HANDLE.store(new_parent.0, sync::atomic::Ordering::Relaxed);
@@ -350,19 +304,20 @@ extern "system" fn find_child_window(handle: HWND, lparam: LPARAM) -> BOOL {
 unsafe extern "system" fn wnd_proc_1(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
         match message {
-            WM_LBUTTONDOWN | WM_LBUTTONDBLCLK => {
-                if DRAG_STATUS.load(std::sync::atomic::Ordering::Relaxed) {
-                    F20_DOWN.store(true, sync::atomic::Ordering::Relaxed);
-                    return CallWindowProcW(PREV_WNDPROC_1, window, WM_KEYDOWN, WPARAM(VK_F20.0 as usize), lparam);
-                }
-                CallWindowProcW(PREV_WNDPROC_1, window, message, wparam, lparam)
-            }
-            WM_LBUTTONUP => {
-                if F20_DOWN.swap(false, sync::atomic::Ordering::Relaxed) {
-                    CallWindowProcW(PREV_WNDPROC_1, window, WM_KEYUP, WPARAM(VK_F20.0 as usize), lparam);
-                }
-                CallWindowProcW(PREV_WNDPROC_1, window, message, wparam, lparam)
-            }
+            // F20 left-click emulation disabled: left clicks now pass through to the page normally
+            // WM_LBUTTONDOWN | WM_LBUTTONDBLCLK => {
+            //     if DRAG_STATUS.load(std::sync::atomic::Ordering::Relaxed) {
+            //         F20_DOWN.store(true, sync::atomic::Ordering::Relaxed);
+            //         return CallWindowProcW(PREV_WNDPROC_1, window, WM_KEYDOWN, WPARAM(VK_F20.0 as usize), lparam);
+            //     }
+            //     CallWindowProcW(PREV_WNDPROC_1, window, message, wparam, lparam)
+            // }
+            // WM_LBUTTONUP => {
+            //     if F20_DOWN.swap(false, sync::atomic::Ordering::Relaxed) {
+            //         CallWindowProcW(PREV_WNDPROC_1, window, WM_KEYUP, WPARAM(VK_F20.0 as usize), lparam);
+            //     }
+            //     CallWindowProcW(PREV_WNDPROC_1, window, message, wparam, lparam)
+            // }
             WM_RBUTTONDOWN | WM_RBUTTONDBLCLK | WM_XBUTTONDOWN | WM_NCXBUTTONDBLCLK | WM_MBUTTONDOWN | WM_MBUTTONDBLCLK => {
                 CallWindowProcW(PREV_WNDPROC_1, window, message, WPARAM(wparam.0 & !MK_LBUTTON.0 as usize), lparam)
             }
@@ -423,15 +378,9 @@ unsafe extern "system" fn wnd_proc_widget(window: HWND, message: u32, wparam: WP
     unsafe {
         match message {
             WM_USER => {
-                // 1 = change proc to wnd_proc_widget_rampboost
                 // 2 or 0 = allow-drag status
-                if wparam.0 == 1 {
-                    debug_print!("webview: enabling rampboost window procedure");
-                    SetWindowLongPtrW(window, GWLP_WNDPROC, wnd_proc_widget_rampboost as *const () as isize);
-                } else {
-                    DRAG_STATUS.store(wparam.0 == 2, sync::atomic::Ordering::Relaxed);
-                    debug_print!("webview: drag status={}", wparam.0 == 2);
-                }
+                DRAG_STATUS.store(wparam.0 == 2, sync::atomic::Ordering::Relaxed);
+                debug_print!("webview: drag status={}", wparam.0 == 2);
                 LRESULT(1)
             }
             WM_MOUSEWHEEL | WM_MOUSEHWHEEL | WM_POINTERWHEEL | WM_POINTERHWHEEL => {
@@ -443,34 +392,6 @@ unsafe extern "system" fn wnd_proc_widget(window: HWND, message: u32, wparam: WP
                     return LRESULT(1);
                 }
                 CallWindowProcW(PREV_WNDPROC_2, window, message, wparam, lparam)
-            }
-            _ => CallWindowProcW(PREV_WNDPROC_2, window, message, wparam, lparam),
-        }
-    }
-}
-
-#[unsafe(no_mangle)]
-unsafe extern "system" fn wnd_proc_widget_rampboost(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    unsafe {
-        match message {
-            WM_MOUSEWHEEL | WM_MOUSEHWHEEL | WM_POINTERWHEEL | WM_POINTERHWHEEL => {
-                if DRAG_STATUS.load(sync::atomic::Ordering::Relaxed) {
-                    SCROLL_SENDER.send(()).ok();
-                    return LRESULT(1);
-                }
-                CallWindowProcW(PREV_WNDPROC_2, window, message, wparam, lparam)
-            }
-            WM_USER => {
-                // 3 = change proc to wnd_proc_widget
-                // 2 or 0 = allow-drag status
-                if wparam.0 == 3 {
-                    debug_print!("webview: disabling rampboost window procedure");
-                    SetWindowLongPtrW(window, GWLP_WNDPROC, wnd_proc_widget as *const () as isize);
-                } else {
-                    DRAG_STATUS.store(wparam.0 == 2, sync::atomic::Ordering::Relaxed);
-                    debug_print!("webview: rampboost drag status={}", wparam.0 == 2);
-                }
-                LRESULT(1)
             }
             _ => CallWindowProcW(PREV_WNDPROC_2, window, message, wparam, lparam),
         }

@@ -1,12 +1,9 @@
 [package]
 name = "glorp"
 version = "0.9.2"
-description = "krunker"
+description = "custom webview client"
 authors = ["slav"]
 edition = "2024"
-
-[package.metadata]
-js_bundle_version = "0.2.2"
 
 [workspace]
 members = ["crates/*"]
@@ -25,7 +22,6 @@ strip = "symbols"
 
 [features]
 packaged = []
-auto-update = ["packaged"]
 editor-ignore = []
 verbose-logs = [
     "obs-glorp-capture/verbose-logs",
@@ -57,11 +53,7 @@ webview2-com = { version = "0.39.1", default-features = false }
 ureq = { version = "3.3.*", features = ["rustls"], default-features = false }
 serde = { version = "1.0.*", features = ["derive"], default-features = false }
 regex = { version = "1.13.*", features = ["std", "perf", "perf-dfa-full", "unicode-perl"], default-features = false }
-semver = "1.0.*"
 serde_json = "1.0.*"
-discord-rich-presence = "1.1.*"
-ping-rs = "0.1.*"
-dns-lookup = "3.0.*"
 obs-glorp-capture = { path = "crates/obs-glorp-capture", optional = true }
 render-dll = { path = "crates/render-dll", optional = true }
 webview-dll = { path = "crates/webview-dll", optional = true }

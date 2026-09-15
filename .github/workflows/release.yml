@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: master
+          ref: Glorp-Protox
           fetch-depth: 0
           lfs: true
 

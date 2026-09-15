@@ -1,8 +1,9 @@
-use crate::{app::create_main_window, utils};
+use crate::{constants, utils};
 use std::{
     env,
     ffi::c_void,
-    process, slice, sync,
+    process,
+    sync,
     sync::atomic::{AtomicUsize, Ordering},
 };
 use webview2_com::{Error, Microsoft::Web::WebView2::Win32::*, *};
@@ -10,7 +11,7 @@ use windows::{
     Win32::{
         Foundation::*,
         Graphics::Gdi::*,
-        System::{DataExchange::COPYDATASTRUCT, LibraryLoader::GetModuleHandleW},
+        System::LibraryLoader::GetModuleHandleW,
         UI::{Input::KeyboardAndMouse::*, WindowsAndMessaging::*},
     },
     core::*,
@@ -59,7 +60,7 @@ impl Window {
         let (controller, env, webview) = create_webview2(hwnd, args, env);
         let widget_wnd = unsafe {
             Some(utils::find_child_window_by_class(
-                FindWindowW(w!("krunker_webview"), PCWSTR::null()).unwrap(),
+                FindWindowW(PCWSTR(utils::create_utf_string(constants::WINDOW_CLASS).as_ptr()), PCWSTR::null()).unwrap(),
                 "Chrome_RenderWidgetHostHWND",
             ))
         };
@@ -136,19 +137,7 @@ impl Window {
             VK_F4 | VK_F6 => {
                 utils::set_cpu_throttling(&self.webview, 1.0);
                 unsafe {
-                    let mut raw_uri = PWSTR::null();
-                    self.webview.Source(&mut raw_uri).ok();
-
-                    let current_url = take_pwstr(raw_uri);
-
-                    let target_url = current_url
-                        .split_once("game=")
-                        .map(|(_before, after)| after.trim())
-                        .filter(|id| !id.is_empty())
-                        .map(|id| format!("https://krunker.io/?exclude={}", id))
-                        .unwrap_or_else(|| "https://krunker.io/".to_string());
-
-                    let navigate_uri = HSTRING::from(&target_url);
+                    let navigate_uri = HSTRING::from(constants::TARGET_URL);
                     self.webview.Navigate(&navigate_uri).ok();
 
                     // wparam = 0 (unlocked)
@@ -181,11 +170,13 @@ pub fn create_window(start_mode: &str, is_subwindow: bool, init_state: Option<Wi
             Ok(icon) => icon,
             Err(_) => LoadIconW(None, IDI_APPLICATION).unwrap(),
         };
-        let class_name = if is_subwindow {
-            w!("krunker_webview_subwindow")
+        let class_name_str = if is_subwindow {
+            constants::WINDOW_CLASS_SUB
         } else {
-            w!("krunker_webview")
+            constants::WINDOW_CLASS
         };
+        let class_name_wide = utils::create_utf_string(class_name_str);
+        let class_name = PCWSTR(class_name_wide.as_ptr());
         let wc = WNDCLASSW {
             style: CS_HREDRAW | CS_VREDRAW,
             lpfnWndProc: Some(wnd_proc_setup),
@@ -520,18 +511,6 @@ unsafe extern "system" fn wnd_proc_main(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                 };
                 window.controller.SetBounds(bounds).ok();
             }
-            WM_COPYDATA => {
-                let cds_ptr = lparam.0 as *mut COPYDATASTRUCT;
-                let cds = &*cds_ptr;
-                let data: &[u8] = slice::from_raw_parts(cds.lpData as *const u8, cds.cbData as usize);
-                if let Ok(mut string) = String::from_utf8(data.to_vec()) {
-                    string = serde_json::to_string(&string).unwrap_or_else(|_| String::new());
-                    window
-                        .webview
-                        .ExecuteScript(PCWSTR(utils::create_utf_string(format!("window.glorp.parseArgs({})", string)).as_ptr()), None)
-                        .ok();
-                }
-            }
 
             _ => (),
         }
@@ -571,21 +550,6 @@ unsafe extern "system" fn wnd_proc_subwindow(hwnd: HWND, msg: u32, wparam: WPARA
                     bottom: utils::HIWORD(lparam.0 as usize) as i32,
                 };
                 window.controller.SetBounds(bounds).ok();
-            }
-            WM_COPYDATA => {
-                if WINDOW_COUNT.load(Ordering::SeqCst) != 1 {
-                    return DefWindowProcW(hwnd, msg, wparam, lparam);
-                }
-                let window = create_main_window(Some(window.env.clone()));
-                let cds_ptr = lparam.0 as *mut COPYDATASTRUCT;
-                let cds = &*cds_ptr;
-                let data = slice::from_raw_parts(cds.lpData as *const u8, cds.cbData as usize);
-                if let Ok(string) = String::from_utf8(data.to_vec()) {
-                    window
-                        .webview
-                        .ExecuteScript(PCWSTR(utils::create_utf_string(format!("window.glorp.parseArgs('{}')", string)).as_ptr()), None)
-                        .ok();
-                }
             }
 
             _ => (),

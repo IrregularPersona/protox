@@ -1,9 +1,5 @@
-use crate::{debug_print, modules, utils, utils::config, window};
-use discord_rich_presence::{DiscordIpc, DiscordIpcClient, activity};
-use std::{
-    process, result,
-    sync::{Arc, Mutex},
-};
+use crate::{debug_print, modules, utils, utils::config, window, constants};
+use std::{process, result};
 use webview2_com::{Microsoft::Web::WebView2::Win32::*, *};
 use windows::{
     Win32::{Foundation::*, UI::WindowsAndMessaging::*},
@@ -43,8 +39,12 @@ pub fn set_web_resource_requested_handler(webview: &ICoreWebView2, env: &ICoreWe
     } else {
         std::collections::HashMap::new()
     };
+    let css_override_enabled = config("cssOverride", true);
+    if css_override_enabled {
+        modules::css_override::load(webview);
+    }
 
-    let handler = WebResourceRequestedEventHandler::create(Box::new(move |webview, args| {
+    let handler = WebResourceRequestedEventHandler::create(Box::new(move |_webview, args| {
         let Some(args) = args else {
             return Ok(());
         };
@@ -53,17 +53,22 @@ pub fn set_web_resource_requested_handler(webview: &ICoreWebView2, env: &ICoreWe
         unsafe { request.Uri(&mut uri)? };
         let uri = take_pwstr(uri);
 
-        if uri.contains("krunker.io") {
-            if uri.contains("game-info") || uri.contains("lobby-ranked") {
-                if let Some(webview) = webview {
-                    unsafe {
-                        webview.PostWebMessageAsString(w!("game-updated")).ok();
-                    }
-                }
+        if uri.contains(constants::TARGET_HOST) {
+            if css_override_enabled
+                && let Some(bytes) = modules::css_override::intercept(&uri)
+            {
+                let stream = modules::css_override::create_stream(&bytes)?;
+                let response =
+                    unsafe { env_clone.CreateWebResourceResponse(&stream, 200, w!("OK"), w!("Content-Type: text/css\r\nAccess-Control-Allow-Origin: *"))? };
+                unsafe { args.SetResponse(Some(&response))? };
                 return Ok(());
             }
 
-            let filename: &str = uri.split("krunker.io/").nth(1).and_then(|s| s.split('?').next()).unwrap_or("");
+            let filename: &str = uri
+                .split(&format!("{}/", constants::TARGET_HOST))
+                .nth(1)
+                .and_then(|s| s.split('?').next())
+                .unwrap_or("");
 
             if let Some(stream) = swaps.get(filename) {
                 let response = unsafe { env_clone.CreateWebResourceResponse(stream, 200, w!("OK"), w!("Access-Control-Allow-Origin: *"))? };
@@ -125,9 +130,6 @@ pub fn set_new_window_requested_handler(webview: &ICoreWebView2, env: &ICoreWebV
             args.SetHandled(true).unwrap();
         }
         let (hwnd, window_state) = window::create_window("Custom", true, window_state);
-        let mut uri = PWSTR::null();
-        let _ = unsafe { args.Uri(&mut uri) };
-        let uri = take_pwstr(uri);
         let args = utils::UnsafeSend::new(args);
         let deferral = utils::UnsafeSend::new(deferral);
         let env_for_creation = env_clone.clone();
@@ -135,12 +137,6 @@ pub fn set_new_window_requested_handler(webview: &ICoreWebView2, env: &ICoreWebV
         window::create_core_webview2_controller_async(hwnd, env_for_creation, window_state, move |controller| {
             let controller = controller.unwrap();
             let webview = unsafe { controller.CoreWebView2().unwrap() };
-            if uri.contains("krunker.io/social.html")
-                && config("userscripts", false)
-                && let Err(e) = modules::userscripts::load(&webview, true)
-            {
-                println!("can't load userscripts on social window {}", e);
-            }
 
             unsafe {
                 args.take().SetNewWindow(&webview).unwrap();
@@ -207,7 +203,6 @@ pub fn open_documents_subpath(target: &str) {
 pub fn handle_web_message(
     webview: &ICoreWebView2,
     main_window: &window::Window,
-    discord_client: &Arc<Mutex<Option<DiscordIpcClient>>>,
     message_string: &str,
 ) -> result::Result<(), windows::core::Error> {
     let parts: Vec<&str> = message_string.split(", ").map(|s| s.trim()).collect();
@@ -266,35 +261,6 @@ pub fn handle_web_message(
         }
         ["open", target] => {
             open_documents_subpath(target);
-        }
-        ["rpc-update", part1, part2] => {
-            let state = format!("{} on {}", part1, part2);
-            if let Some(client) = &mut *discord_client.lock().unwrap() {
-                let activity = activity::Activity::new().details("Krunker").state(&state).assets(activity::Assets::new());
-                if let Err(e) = client.set_activity(activity) {
-                    eprintln!("Failed to set rpc activity: {}", e);
-                }
-            }
-        }
-        ["toggle-rboost", value] => {
-            const ENABLED: usize = 1;
-            const DISABLED: usize = 3;
-            let value = value.parse::<bool>().unwrap_or(false);
-            unsafe {
-                PostMessageW(
-                    Some(utils::find_child_window_by_class(
-                        FindWindowW(w!("krunker_webview"), PCWSTR::null()).unwrap(),
-                        "Chrome_RenderWidgetHostHWND",
-                    )),
-                    WM_USER,
-                    WPARAM(if value { ENABLED } else { DISABLED }),
-                    LPARAM(0),
-                )
-                .ok();
-            }
-        }
-        ["ping"] => {
-            modules::ping::ping(webview);
         }
         _ => {}
     }

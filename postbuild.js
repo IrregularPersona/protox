@@ -47,15 +47,6 @@ try {
 		if (fs.existsSync(resourcesVcruntimePath)) fs.copyFileSync(resourcesVcruntimePath, vcruntimePath);
 	}
 
-	const bundleVersionPath = path.join(process.cwd(), "target", "bundle_version");
-	if (fs.existsSync(bundleVersionPath)) {
-		fs.copyFileSync(bundleVersionPath, path.join(targetResourcesDir, "bundle_version"));
-	}
-	const bundleJsPath = path.join(process.cwd(), "target", "bundle.js");
-	if (fs.existsSync(bundleJsPath)) {
-		fs.copyFileSync(bundleJsPath, path.join(targetResourcesDir, "bundle.js"));
-	}
-
 	const obsPluginSrc = path.join(targetDir, "obs_glorp_capture.dll");
 	if (fs.existsSync(obsPluginSrc)) {
 		fs.copyFileSync(obsPluginSrc, path.join(targetResourcesDir, "obs-glorp-capture.dll"));

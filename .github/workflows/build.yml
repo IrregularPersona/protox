@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: [master]
+    branches: [Glorp-Protox]
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: master
+          ref: Glorp-Protox
           fetch-depth: 0
           lfs: true
 

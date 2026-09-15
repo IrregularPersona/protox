@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::fs;
 extern crate embed_resource;
 extern crate toml;
 fn main() {
@@ -12,10 +12,6 @@ fn main() {
     let toml_content = fs::read_to_string("Cargo.toml").unwrap();
     let toml: toml::Value = toml::from_str(&toml_content).unwrap();
     let package_version = toml["package"]["version"].as_str().unwrap();
-    let js_bundle_version = toml["package"]["metadata"]["js_bundle_version"].as_str().unwrap();
-
-    let dest_path = env::current_dir().unwrap().join("target/bundle_version");
-    fs::write(dest_path, js_bundle_version).unwrap();
 
     let wxs_path = "resources/installer_script.wxs";
     let wxs_content = fs::read_to_string(wxs_path).unwrap();

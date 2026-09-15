@@ -8,7 +8,7 @@ use windows::{
     core::*,
 };
 
-use crate::utils;
+use crate::{constants, utils};
 
 fn recurse_swap(root_dir: PathBuf, swap_dir: PathBuf, window: &ICoreWebView2) -> Option<HashMap<String, IStream>> {
     let mut swaps = HashMap::new();
@@ -24,7 +24,10 @@ fn recurse_swap(root_dir: PathBuf, swap_dir: PathBuf, window: &ICoreWebView2) ->
         } else if file_type.is_file() {
             let relative_path = entry.path().strip_prefix(&root_dir).unwrap().to_str().unwrap().replace("\\", "/");
             unsafe {
-                let url = (format!("*://krunker.io/{}*", relative_path), format!("*://*.krunker.io/{}*", relative_path));
+                let url = (
+                    format!("*://{}/{}*", constants::TARGET_HOST, relative_path),
+                    format!("*://*.{}/{}*", constants::TARGET_HOST, relative_path),
+                );
 
                 for url_part in [&url.0, &url.1] {
                     if let Err(e) =
