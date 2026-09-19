@@ -2,6 +2,8 @@
 
 Glorp uses unorthodox methods in attempt of fixing the issues modern chromium poses for a browser game
 
+> Do note, no releases as of now. I will be putting out releases soon enough.
+
 # Why is the client getting marked as a trojan?
 
 - **The installer is not signed:** digital signatures help verify software, but in the case of such a small open source project, paying for a license is not feasible, so antiviruses will mark it as malicious.
